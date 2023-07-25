@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- this head block does some imports -->
+<!-- we import React, React DOM, Babel (needed for React), prop types (needed for Recharts), and finally, RechartsJS-->
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>BLS Data for Lightcast</title>
+  <!-- Import the React, React-Dom and Babel libraries from unpkg -->
+  <script type="application/javascript" src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script type="application/javascript" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script type="application/javascript" src="https://unpkg.com/babel-standalone@6.26.0/babel.js"></script>
+  <script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
+  <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+</head>
+
+<body>
+  <!-- create the top-level div -->
+  <div id="root"></div>
+
+  <!-- the style block sets up fonts -->
+  <style type="text/css">
+    @font-face {
+      font-family: "Lausanne";
+      src: url("./TWKLausanne-400.ttf") format("truetype");
+    }
+
+    @font-face {
+      font-family: "EverettMono";
+      src: url("./TWKEverettMono-Regular-web.ttf") format("truetype");
+    }
+
+    h2,
+    h1,
+    h3,
+    h4 {
+      font-family: "Lausanne", Verdana, Tahoma;
+    }
+
+    ticklabel {
+      font-family: "EverettMono";
+    }
+  </style>
+
+  <!-- this is where the magic happens! notice it's a babel script - this allows the use of 
+JSX, which is javascript with HTML mixed in-->
+  <script type="text/babel">
+    // Obtain the root 
+    const rootElement = document.getElementById('root')
+    // define colors - with multi-series, the lines/bars will appear in this order of colors
+    const colors = ["#FF2F59", "#CA61FF", "#18E8F5", "#0A5D62", "#8A8A8A", "#2E5299", "#93293B"]
+
+
+    // this class is a general class that has parameters to produce any of the charts we need
+    class InteractiveChart extends React.Component {
+
+      // this is necessary because it extends react components
+      constructor(props) {
+        super(props)
+        this.state = {
+          data: []
+        }
+      }
+
+      // react built-in function that runs when the component/chart loads
+      componentDidMount = () => {
+
+        // this is so we can reference this from within a lambda
+        let self = this;
+        // console.log(this.props)
+
+        // from props (which is a data object passed into this component),
+        // get the dataurl and fetch the JSON file it leads to
+        fetch(this.props.dataurl,
+          {
+            method: 'GET',
+            mode: 'cors',
+          })
+          .then(
+            response => {
+              if (response.status !== 200) {
+                console.log('Looks like there was a problem. Status Code: ' +
+                  response.status);
+                console.log(response);
+                return;
+              }
+              // Examine the text in the response
+              response.json().then(function (data) {
+                console.log("Got data!")
+                // console.log(data);
+                // remember self= this? now we can access this component's state and set the data from JSON to it
+                self.setState({
+                  data: data
+                });
+                return;
+              });
+
+            })
+          .catch(err => console.log('Fetch Error :-S', err));
+        console.log(this.state.data);
+      }
+
+      // every react component has this function
+      // it must return an HTML object
+      render() {
+        // ADD MORE CHARTS HERE
+        // const data = getData(this.props.dataurl);
+        // console.log(this.state.data);
+        // this is to make sure we don't render a chart if the data pull didn't go through
+        if (typeof (this.state.data) == []) {
+          return <div />
+        }
+
+        // but if it did? some functions that check the chart type from the props
+        if (this.props.chart_type == "line") {
+          return (
+            // wrap the whole thing in a div
+            // make the div centered and about 75% of the screen width
+            // height is fixed because it has to be
+            // add some margin too
+            <div style={{ margin: "0 auto", width: "75vw", height: "500px", marginBottom: "150px" }}>
+              {/* commenting in a JSX script is weird
+                anyway, add in the title and subtitles
+                the best thing about doing this in HTML is that they'll never overlap or have sizing issues!
+                */}
+              <h2 style={{ marginTop: "30px", marginBottom: "3px" }}>{this.props.title}</h2>
+              <h4 style={{ marginTop: "2px", marginBottom: "10px" }}>{this.props.subtitle}</h4>
+              {/*Wrap the chart in a responsivecontainer, which is the magic bit that allows it to resize*/}
+              <ResponsiveContainer width="100%" height="100%">
+                {/*do a linechart*/}
+                {/*the style attributes center it and add some margins above and below*/}
+                <LineChart style={{ marginRight: "auto", marginLeft: "auto", marginBottom: "5px", marginTop: "10px", width: "100%" }}
+                  width={750} height={400} data={this.state.data}
+                  margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+                  {/*best I can tell with the double margin thing - so the one within the style object is the margins for the whole 
+                  chart HTML object, whereas the margin object outside of the inline style is the margins of the actual graphics
+                  within the HTML object - that probably made no sense, so just play with I guess*/}
+
+
+                  {/* add an x axis*/}
+                  <XAxis dataKey={this.props.axis} style={{
+                    fontSize: '0.8rem',
+                    fontFamily: 'Lausanne',
+                  }} />
+                  {/* add a y axis, make sure to format the numbers*/}
+                  <YAxis style={{
+                    fontSize: '0.7rem',
+                    fontFamily: 'EverettMono',
+                  }} tickFormatter={this.props.series_format} tickCount={8} />
+                  {/* add a grid*/}
+                  <CartesianGrid vertical={false} />
+                  {/*add the hover tooltip, format it a little*/}
+                  <Tooltip formatter={(value, name, props) => this.props.series_format(value)}
+                    labelStyle={{ fontFamily: "Lausanne" }}
+                    itemStyle={{ fontFamily: "Lausanne" }}
+                    contentStyle={{
+                      borderRadius: 10, borderColor: "#FFDFE6", boxShadow:
+                        "0 1px 1px rgba(0,0,0,0.11), 0 2px 2px rgba(0, 0, 0, 0.11),0 4px 4px rgba(0,0,0,0.11),0 8px 8px rgba(0,0,0,0.11),0 16px 16px rgba(0,0,0,0.11),0 32px 32px rgba(0,0,0,0.11)"
+                    }} />
+                  {/*add a legend, change the fonts too*/}
+                  <Legend formatter={(value, name, props) => <span style={{ fontFamily: "Lausanne" }}>{value}</span>} />
+
+                  {/*for each series element, add a new line, iterate the colors*/}
+                  {
+                    this.props.series_indices.map((id) => {
+                      return (<Line type="monotone" dot={false} name={this.props.series_names[id]} dataKey={this.props.series_ids[id]} stroke={colors[id]} />)
+                    })
+                  }
+
+                </LineChart>
+              </ResponsiveContainer >
+              <div>
+                <h4 style={{ marginTop: "2px", display: "inline-block", float: "left" }}>Source: Bureau of Labor Statistics</h4>
+                <img src="Lightcast Tessell.PNG" style={{ width: 96, height: 22, display: "inline-block", float: "right" }} />
+              </div>
+            </div>
+          );
+        }
+
+        if (this.props.chart_type == "bar") {
+          return (
+            <div style={{ margin: "0 auto", width: "75vw", height: "500px", marginBottom: "150px" }}>
+              <h2 style={{ marginTop: "30px", marginBottom: "3px" }}>{this.props.title}</h2>
+              <h4 style={{ marginTop: "2px" }}>{this.props.subtitle}</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  width={750}
+                  height={400}
+                  data={this.state.data}
+                  margin={{
+                    top: 5,
+                    right: 30,
+                    left: 20,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey={this.props.axis} style={{
+                    fontSize: '0.8rem',
+                    fontFamily: 'Lausanne',
+                  }} />
+                  <YAxis style={{
+                    fontSize: '0.7rem',
+                    fontFamily: 'EverettMono',
+                  }} tickFormatter={this.props.series_format} tickCount={8} />
+                  <Tooltip formatter={(value, name, props) => this.props.series_format(value)}
+                    labelStyle={{ fontFamily: "Lausanne" }}
+                    itemStyle={{ fontFamily: "Lausanne" }}
+                    contentStyle={{
+                      borderRadius: 10, borderColor: "#FFDFE6", boxShadow:
+                        "0 1px 1px rgba(0,0,0,0.11), 0 2px 2px rgba(0, 0, 0, 0.11),0 4px 4px rgba(0,0,0,0.11),0 8px 8px rgba(0,0,0,0.11),0 16px 16px rgba(0,0,0,0.11),0 32px 32px rgba(0,0,0,0.11)"
+                    }} />
+
+                  <Legend formatter={(value, name, props) => <span style={{ fontFamily: "Lausanne" }}>{value}</span>} />
+                  {
+                    this.props.series_indices.map((id) => {
+                      return (<Bar name={this.props.series_names[id]} dataKey={this.props.series_ids[id]} fill={colors[id]} radius={[4, 4, 0, 0]} />)
+                    })
+                  }
+                </BarChart>
+              </ResponsiveContainer>
+              <div>
+                <h4 style={{ marginTop: "2px", display: "inline-block", float: "left" }}>Source: Bureau of Labor Statistics</h4>
+                <img src="Lightcast Tessell.PNG" style={{ width: 96, height: 22, display: "inline-block", float: "right" }} />
+              </div>
+            </div>
+          );
+        }
+
+        if (this.props.chart_type == "bar_h") {
+          return (
+            <div style={{ margin: "0 auto", width: "75vw", height: "500px", marginBottom: "150px" }}>
+              <h2 style={{ marginTop: "30px", marginBottom: "3px" }}>{this.props.title}</h2>
+              <h4 style={{ marginTop: "2px" }}>{this.props.subtitle}</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  width={750}
+                  height={400}
+                  layout="vertical"
+                  data={this.state.data}
+                  margin={{
+                    top: 5,
+                    right: 30,
+                    left: 50,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid horizontal={false} />
+                  <XAxis type="number" style={{
+                    fontSize: '0.7rem',
+                    fontFamily: 'EverettMono',
+                  }} tickFormatter={this.props.series_format} tickCount={8} />
+                  <YAxis type="category" dataKey={this.props.axis} style={{
+                    fontSize: '0.8rem',
+                    fontFamily: 'Lausanne',
+                  }} />
+                  <Tooltip formatter={(value, name, props) => this.props.series_format(value)}
+                    labelStyle={{ fontFamily: "Lausanne" }}
+                    itemStyle={{ fontFamily: "Lausanne" }}
+                    contentStyle={{
+                      borderRadius: 10, borderColor: "#FFDFE6", boxShadow:
+                        "0 1px 1px rgba(0,0,0,0.11), 0 2px 2px rgba(0, 0, 0, 0.11),0 4px 4px rgba(0,0,0,0.11),0 8px 8px rgba(0,0,0,0.11),0 16px 16px rgba(0,0,0,0.11),0 32px 32px rgba(0,0,0,0.11)"
+                    }} />
+
+                  <Legend formatter={(value, name, props) => <span style={{ fontFamily: "Lausanne" }}>{value}</span>} />
+                  {
+                    this.props.series_indices.map((id) => {
+                      return (<Bar name={this.props.series_names[id]} dataKey={this.props.series_ids[id]} fill={colors[id]} radius={[0, 4, 4, 0]} />)
+                    })
+                  }
+                </BarChart>
+              </ResponsiveContainer>
+              <div>
+                <h4 style={{ marginTop: "2px", display: "inline-block", float: "left" }}>Source: Bureau of Labor Statistics</h4>
+                <img src="Lightcast Tessell.PNG" style={{ width: 96, height: 22, display: "inline-block", float: "right" }} />
+              </div>
+            </div>
+          );
+        }
+
+      }
+    }
+
+    const InteractiveList = ({ list }) => (
+      <ul>
+        {list.map(item => (
+          <InteractiveChart title={item.title}
+            dataurl={item.link}
+            subtitle={item.subtitle}
+            series_indices={item.series_indices}
+            chart_type={item.chart_type}
+            axis={item.axis}
+            series_ids={item.series_ids}
+            series_names={item.series_names}
+            series_format={item.series_format}
+          />
+        ))}
+      </ul>
+    );
+
+    const percentFormat = (tick) => {
+      return `${tick.toFixed(2)}%`;
+    }
+    const defaultFormat = (tick) => {
+      return tick;
+    }
+
+    console.log("Running!")
+
+    var interactiveURLS = [{
+      "link": "https://bls-cpi.s3.amazonaws.com/json_all_change.json",
+      "title": "CPI for all urban customers",
+      "subtitle": "All items in US city everage",
+      "chart_type": "line",
+      "axis": "month_year",
+      "series_indices": [0, 1],
+      "series_ids": ["cpi_yoy_change", "change_mom_cpi"],
+      "series_names": ["YoY CPI Change", "MoM CPI Change"],
+      "series_format": percentFormat
+    },
+    {
+      "link": "https://bls-cpi.s3.amazonaws.com/json_all_core_change.json",
+      "title": "CPI for all urban customers",
+      "subtitle": "All items in US city everage",
+      "chart_type": "line",
+      "axis": "month_year",
+      "series_indices": [0, 1],
+      "series_ids": ["change_mom_cpi_all", "change_mom_cpi_core"],
+      "series_names": ["All items", "All items less food and energy"],
+      "series_format": percentFormat
+    },
+    {
+      "link": "https://bls-cpi.s3.amazonaws.com/json_final_yoy_all_items_change_2.json",
+      "title": "CPI for all urban customers",
+      "subtitle": "Percent change from 12 months ago, unadjusted",
+      "chart_type": "bar",
+      "axis": "series_name",
+      "series_indices": [0, 1, 2],
+      "series_ids": ["Apr 2023", "Mar 2adad023", "May 2023"],
+      // putting random data in the names to verify that it gets them from the server instead
+      "series_names": ["Apriadadl 2023", "Madadadr 2023", "May 2023"],
+      "series_format": percentFormat
+    },
+    {
+      "link": "https://bls-cpi.s3.amazonaws.com/json_Comp_cpi_yoy.json",
+      "title": "YOY Change for Hourly Earnings and CPI",
+      "subtitle": "In percentage and unadjusted",
+      "chart_type": "line",
+      "axis": "month_year",
+      "series_indices": [0, 1],
+      "series_ids": ["increase", "cpi_yoy_change"],
+      "series_names": ["Increase in Hourly Earnings", "CPI (all items)"],
+      "series_format": percentFormat
+    }, {
+      "link": "https://bls-cpi.s3.amazonaws.com/json_final_yoy_cat_items_change.json",
+      "title": "CPI for all urban customers",
+      "subtitle": "Percent change from 12 months ago, unadjusted",
+      "chart_type": "bar_h",
+      "axis": "series_title",
+      "series_indices": [0, 1, 2],
+      "series_ids": ["Madar dada2023", "Apr 2023a", "May 2adad023"],
+      "series_names": ["Mar adad2023", "Apriadadal 2023a", "May 202dada3"],
+      "series_format": percentFormat
+    }]
+
+    let dataGlobal;
+
+    const getData = async () => {
+      const response = await fetch("https://bls-cpi.s3.amazonaws.com/json_datedata_df.json");
+      const data = await response.json();
+      dataGlobal = data;
+      return data;
+    };
+
+
+    const { PieChart,
+      Pie, Line, LineChart, linearGradient, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+      Bar, BarChart } = window.Recharts
+
+    function App() {
+
+      const [state, setState] = React.useState({
+        urls: [],
+        gotData: false
+      });
+      let self = setState;
+
+      React.useEffect(() => {
+
+
+        getData().then((output) => {
+          console.log(output)
+          // console.log(interactiveURLS[interactiveURLS.length-1].series_ids = dataGlobal/)
+          const currMoList = [output[2].month_year, output[1].month_year, output[0].month_year]
+          const currMoIDList = [output[2].month_year_s, output[1].month_year_s, output[0].month_year_s]
+          console.log(currMoList)
+          // manually updating the two series that require dates
+          // there's probably a better way to do this
+          interactiveURLS[4].series_names = currMoList
+          interactiveURLS[4].series_ids = currMoIDList
+
+          interactiveURLS[2].series_names = currMoList
+          interactiveURLS[2].series_ids = currMoIDList
+
+          console.log(interactiveURLS)
+          self({ urls: interactiveURLS, gotData: true })
+        }
+        );
+
+      }, [])
+
+      if (!state.gotData) {
+        return (
+          <div>
+            <h1 style={{ margin: "auto", textAlign: "center", padding: "20px" }}>CPI Data</h1>
+            <h2 style={{ margin: "auto", textAlign: "center" }}>This webpage contains up-to-date Lightcast-branded charts on BLS CPI data</h2>
+            <h3 style={{ margin: "auto", textAlign: "center", padding: "20px" }}>Loading time information...</h3>
+          </div>
+        )
+      }
+      return (
+        <div>
+          <h1 style={{ margin: "auto", textAlign: "center", padding: "20px" }}>CPI Data</h1>
+          <h2 style={{ margin: "auto", textAlign: "center" }}>This webpage contains up-to-date Lightcast-branded charts on BLS CPI data</h2>
+          <InteractiveList list={state.urls} />
+        </div>
+      )
+    }
+
+
+    // Use the ReactDOM.render to show your component on the browser
+    ReactDOM.render(
+      <App />,
+      rootElement
+    )
+  </script>
+
+</body>
+
+</html>
